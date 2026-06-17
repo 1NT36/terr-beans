@@ -14,7 +14,16 @@ export async function onRequest(context) {
 
   if (request.method === 'POST') {
     try {
-      const { password } = await request.json();
+      const body = await request.json();
+      const { password } = body;
+      
+      if (!password) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          message: 'Password required' 
+        }), { status: 400, headers });
+      }
+      
       const isValid = password === env.PASSWORD;
       
       return new Response(JSON.stringify({ 
