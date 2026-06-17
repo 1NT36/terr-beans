@@ -44,9 +44,10 @@ export async function onRequest(context) {
 
     // POST: Add new account
     if (request.method === 'POST' && url.pathname === '/api/ledger') {
-      const { name, balance } = await request.json();
+      const body = await request.json();
+      const { name, balance } = body;
       
-      if (!name || balance === undefined) {
+      if (!name || balance === undefined || balance === null) {
         return new Response(JSON.stringify({ error: 'Name and balance required' }), { 
           status: 400, 
           headers 
@@ -54,16 +55,32 @@ export async function onRequest(context) {
       }
 
       const id = 'acct_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-      const result = await db.prepare(
-        'INSERT INTO accounts (id, name, balance, last_updated, last_change) VALUES (?, ?, ?, ?, ?) RETURNING *'
-      ).bind(id, name, Math.round(balance * 100) / 100, Date.now(), 0).run();
+      const now = Date.now();
+      const balanceNum = parseFloat(balance) || 0;
       
-      return new Response(JSON.stringify(result.results), { headers });
+      // Insert with explicit type conversion
+      const result = await db.prepare(
+        'INSERT INTO accounts (id, name, balance, last_updated, last_change) VALUES (?, ?, ?, ?, ?)'
+      ).bind(
+        id, 
+        name, 
+        Math.round(balanceNum * 100) / 100, 
+        now, 
+        0
+      ).run();
+      
+      // Fetch the newly created account
+      const newAccount = await db.prepare(
+        'SELECT * FROM accounts WHERE id = ?'
+      ).bind(id).first();
+      
+      return new Response(JSON.stringify(newAccount || { id, name, balance: Math.round(balanceNum * 100) / 100, last_updated: now, last_change: 0 }), { headers });
     }
 
-    // PUT: Update account (edit name or balance)
+    // PUT: Update account
     if (request.method === 'PUT' && url.pathname === '/api/ledger') {
-      const { id, name, balance, lastChange } = await request.json();
+      const body = await request.json();
+      const { id, name, balance, lastChange } = body;
       
       if (!id) {
         return new Response(JSON.stringify({ error: 'Account ID required' }), { 
@@ -75,17 +92,19 @@ export async function onRequest(context) {
       let query = 'UPDATE accounts SET ';
       const params = [];
       
-      if (name !== undefined) {
+      if (name !== undefined && name !== null) {
         query += 'name = ?, ';
         params.push(name);
       }
-      if (balance !== undefined) {
+      if (balance !== undefined && balance !== null) {
+        const balanceNum = parseFloat(balance) || 0;
         query += 'balance = ?, ';
-        params.push(Math.round(balance * 100) / 100);
+        params.push(Math.round(balanceNum * 100) / 100);
       }
-      if (lastChange !== undefined) {
+      if (lastChange !== undefined && lastChange !== null) {
+        const changeNum = parseFloat(lastChange) || 0;
         query += 'last_change = ?, ';
-        params.push(Math.round(lastChange * 100) / 100);
+        params.push(Math.round(changeNum * 100) / 100);
       }
       
       query += 'last_updated = ? WHERE id = ? RETURNING *';
@@ -93,12 +112,18 @@ export async function onRequest(context) {
 
       const result = await db.prepare(query).bind(...params).run();
       
-      return new Response(JSON.stringify(result.results), { headers });
+      // Fetch the updated account
+      const updatedAccount = await db.prepare(
+        'SELECT * FROM accounts WHERE id = ?'
+      ).bind(id).first();
+      
+      return new Response(JSON.stringify(updatedAccount || { success: true }), { headers });
     }
 
     // DELETE: Remove account
     if (request.method === 'DELETE' && url.pathname === '/api/ledger') {
-      const { id } = await request.json();
+      const body = await request.json();
+      const { id } = body;
       
       if (!id) {
         return new Response(JSON.stringify({ error: 'Account ID required' }), { 
@@ -112,7 +137,7 @@ export async function onRequest(context) {
       return new Response(JSON.stringify({ success: true }), { headers });
     }
 
-    // POST: Apply interest to all accounts
+    // POST: Apply interest
     if (request.method === 'POST' && url.pathname === '/api/ledger/interest') {
       const accounts = await db.prepare('SELECT * FROM accounts').all();
       const now = Date.now();
@@ -153,7 +178,8 @@ export async function onRequest(context) {
     return new Response('Not Found', { status: 404, headers });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { 
+    console.error('API Error:', error);
+    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), { 
       status: 500, 
       headers 
     });
