@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ledger</title>
+<title>TERR.ABB</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
 <style>
@@ -33,7 +33,6 @@
     overflow-x: hidden;
   }
 
-  /* ── HEADER ── */
   header {
     display: flex;
     align-items: center;
@@ -110,7 +109,6 @@
     background: rgba(0,200,83,0.07);
   }
 
-  /* ── SUMMARY BAR ── */
   .summary-bar {
     display: flex;
     gap: 0;
@@ -145,7 +143,6 @@
   .stat-value.neg { color: var(--red); }
   .stat-value.neutral { color: var(--text); }
 
-  /* ── MAIN TABLE ── */
   .table-wrapper {
     padding: 0 32px 32px;
     overflow-x: auto;
@@ -263,7 +260,6 @@
   }
   tr:hover .action-btns { opacity: 1; }
 
-  /* interest tag */
   .interest-tag {
     display: inline-block;
     font-family: 'JetBrains Mono', monospace;
@@ -276,7 +272,6 @@
   .interest-tag.accrued { background: rgba(0,200,83,0.12); color: var(--green); }
   .interest-tag.debt    { background: rgba(255,59,48,0.12); color: var(--red); }
 
-  /* ── EMPTY STATE ── */
   .empty-state {
     padding: 60px 16px;
     text-align: center;
@@ -285,7 +280,6 @@
   .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
   .empty-state p { font-size: 14px; margin-bottom: 18px; }
 
-  /* ── MODAL ── */
   .modal-backdrop {
     display: none;
     position: fixed;
@@ -371,7 +365,6 @@
     min-height: 16px;
   }
 
-  /* ── TOAST ── */
   #toast {
     position: fixed;
     bottom: 28px;
@@ -391,12 +384,10 @@
   }
   #toast.show { transform: translateX(-50%) translateY(0); }
 
-  /* ── SCROLLBAR ── */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
-  /* ── WEEKLY NOTE ── */
   .weekly-note {
     font-size: 11px;
     color: var(--text-dim);
@@ -481,8 +472,6 @@
   </div>
 </div>
 
-<!-- SUMMARY TOTAL ROW (footer) -->
-
 <!-- MODAL: Add / Edit Account -->
 <div class="modal-backdrop" id="accountModal">
   <div class="modal">
@@ -541,101 +530,59 @@
 
 <script>
 // ════════════════════════════════════════════════
-//  CONFIG — change password here
+//  CONFIG
 // ════════════════════════════════════════════════
-const PASSWORD = "admin123";       // ← change this
-const INTEREST_RATE = 0.10;        // 10% per week
+const API_URL = '/api/ledger';
+const AUTH_URL = '/api/auth';
+const INTEREST_RATE = 0.10;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ════════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════════
 let isAdmin = false;
-let accounts = [];          // [{id, name, balance, lastUpdated, lastChange}]
+let accounts = [];
 let editingId = null;
+let adjustingId = null;
 let deletingId = null;
-
-// ════════════════════════════════════════════════
-//  PERSISTENCE
-// ════════════════════════════════════════════════
-function loadData() {
-  try {
-    const raw = localStorage.getItem('ledger_accounts');
-    accounts = raw ? JSON.parse(raw) : [];
-    // migrate old entries without lastChange
-    accounts.forEach(a => {
-      if (a.lastChange === undefined) a.lastChange = 0;
-    });
-  } catch(e) { accounts = []; }
-}
-
-function saveData() {
-  localStorage.setItem('ledger_accounts', JSON.stringify(accounts));
-}
-
-// ════════════════════════════════════════════════
-//  INTEREST LOGIC
-// ════════════════════════════════════════════════
-function applyAccruedInterest() {
-  const now = Date.now();
-  let changed = false;
-  accounts.forEach(a => {
-    const elapsed = now - a.lastUpdated;
-    const weeksElapsed = Math.floor(elapsed / WEEK_MS);
-    if (weeksElapsed >= 1) {
-      const oldBalance = a.balance;
-      // Compound for each week
-      let b = a.balance;
-      for (let w = 0; w < weeksElapsed; w++) {
-        b = b >= 0 ? b * (1 + INTEREST_RATE) : b * (1 + INTEREST_RATE);
-      }
-      b = Math.round(b * 100) / 100;
-      a.lastChange = b - oldBalance;
-      a.balance = b;
-      // Advance lastUpdated by the exact weeks applied (not to now)
-      a.lastUpdated += weeksElapsed * WEEK_MS;
-      changed = true;
-    }
-  });
-  if (changed) saveData();
-  return changed;
-}
-
-function applyInterestManually() {
-  // Force apply one week of interest immediately for testing/admin
-  const now = Date.now();
-  accounts.forEach(a => {
-    const oldBalance = a.balance;
-    let b = a.balance;
-    b = Math.round(b * (1 + INTEREST_RATE) * 100) / 100;
-    a.lastChange = b - oldBalance;
-    a.balance = b;
-    a.lastUpdated = now;
-  });
-  saveData();
-  render();
-  toast("Interest applied to all accounts ✓");
-}
+let authToken = localStorage.getItem('authToken') || '';
 
 // ════════════════════════════════════════════════
 //  AUTH
 // ════════════════════════════════════════════════
-function tryAuth() {
+async function tryAuth() {
   const val = document.getElementById('pwInput').value;
-  if (val === PASSWORD) {
-    isAdmin = true;
-    document.getElementById('authArea').style.display = 'none';
-    document.getElementById('adminBadge').style.display = '';
-    document.getElementById('lockBtn').style.display = '';
-    document.getElementById('addBtn').style.display = '';
-    document.getElementById('interestBtn').style.display = '';
-    document.getElementById('actionsHeader').style.display = '';
-    document.getElementById('pwInput').value = '';
-    render();
-    toast("Admin access granted ✓");
-  } else {
-    document.getElementById('pwInput').style.borderColor = 'var(--red)';
-    setTimeout(() => document.getElementById('pwInput').style.borderColor = '', 1200);
+  
+  try {
+    const response = await fetch(AUTH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: val })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      isAdmin = true;
+      authToken = val;
+      localStorage.setItem('authToken', val);
+      document.getElementById('authArea').style.display = 'none';
+      document.getElementById('adminBadge').style.display = '';
+      document.getElementById('lockBtn').style.display = '';
+      document.getElementById('addBtn').style.display = '';
+      document.getElementById('interestBtn').style.display = '';
+      document.getElementById('actionsHeader').style.display = '';
+      document.getElementById('pwInput').value = '';
+      await loadData();
+      render();
+      toast("Admin access granted ✓");
+    } else {
+      document.getElementById('pwInput').style.borderColor = 'var(--red)';
+      setTimeout(() => document.getElementById('pwInput').style.borderColor = '', 1200);
+      toast("Invalid password");
+    }
+  } catch (error) {
+    toast("Auth error: " + error.message);
   }
 }
 
@@ -645,6 +592,8 @@ document.getElementById('pwInput').addEventListener('keydown', e => {
 
 function lock() {
   isAdmin = false;
+  authToken = '';
+  localStorage.removeItem('authToken');
   document.getElementById('authArea').style.display = '';
   document.getElementById('adminBadge').style.display = 'none';
   document.getElementById('lockBtn').style.display = 'none';
@@ -652,6 +601,66 @@ function lock() {
   document.getElementById('interestBtn').style.display = 'none';
   document.getElementById('actionsHeader').style.display = 'none';
   render();
+}
+
+// ════════════════════════════════════════════════
+//  API HELPERS
+// ════════════════════════════════════════════════
+function getHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (isAdmin && authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  return headers;
+}
+
+async function apiCall(method, endpoint, data = null) {
+  const options = {
+    method,
+    headers: getHeaders()
+  };
+  if (data) {
+    options.body = JSON.stringify(data);
+  }
+  
+  const response = await fetch(endpoint, options);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'API call failed');
+  }
+  return await response.json();
+}
+
+// ════════════════════════════════════════════════
+//  DATA LOADING
+// ════════════════════════════════════════════════
+async function loadData() {
+  try {
+    const data = await apiCall('GET', API_URL);
+    accounts = data || [];
+    accounts.forEach(a => {
+      if (a.lastChange === undefined) a.lastChange = 0;
+    });
+  } catch(e) {
+    console.error('Load error:', e);
+    accounts = [];
+    toast('Failed to load data');
+  }
+}
+
+// ════════════════════════════════════════════════
+//  INTEREST LOGIC
+// ════════════════════════════════════════════════
+async function applyInterestManually() {
+  if (!isAdmin) return;
+  try {
+    const result = await apiCall('POST', API_URL + '/interest');
+    toast(`Interest applied to ${result.accountsUpdated} account(s) ✓`);
+    await loadData();
+    render();
+  } catch(e) {
+    toast('Error applying interest: ' + e.message);
+  }
 }
 
 // ════════════════════════════════════════════════
@@ -689,7 +698,6 @@ function render() {
   const summaryBar = document.getElementById('summaryBar');
   const accountCount = document.getElementById('accountCount');
 
-  // Summary
   const total = accounts.reduce((s, a) => s + a.balance, 0);
   const inDebt = accounts.filter(a => a.balance < 0).length;
   const positive = accounts.filter(a => a.balance >= 0).length;
@@ -718,14 +726,14 @@ function render() {
   if (accounts.length === 0) {
     tbody.innerHTML = '';
     emptyState.style.display = isAdmin ? '' : 'block';
-    emptyState.querySelector('button').style.display = isAdmin ? '' : 'none';
+    const btn = emptyState.querySelector('button');
+    if (btn) btn.style.display = isAdmin ? '' : 'none';
     return;
   }
   emptyState.style.display = 'none';
 
   tbody.innerHTML = accounts.map((a, i) => {
     const isPos = a.balance >= 0;
-    const changeClass = a.lastChange > 0 ? 'pos' : a.lastChange < 0 ? 'neg' : '';
     const actionBtns = isAdmin ? `
       <div class="action-btns">
         <button class="btn btn-ghost btn-sm" onclick="openAdjust('${a.id}')">± Adjust</button>
@@ -755,17 +763,19 @@ function openModal(id) {
 }
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
-  document.getElementById('modalError') && (document.getElementById('modalError').textContent = '');
-  document.getElementById('adjustError') && (document.getElementById('adjustError').textContent = '');
+  const err1 = document.getElementById('modalError');
+  const err2 = document.getElementById('adjustError');
+  if (err1) err1.textContent = '';
+  if (err2) err2.textContent = '';
 }
 
-// Close on backdrop click
 document.querySelectorAll('.modal-backdrop').forEach(b => {
   b.addEventListener('click', e => { if (e.target === b) closeModal(b.id); });
 });
 
 // Add Account
 function openAddModal() {
+  if (!isAdmin) return;
   editingId = null;
   document.getElementById('modalTitle').textContent = 'New Account';
   document.getElementById('modalSub').textContent = 'Add a new account to the ledger.';
@@ -778,6 +788,7 @@ function openAddModal() {
 
 // Edit Account
 function openEdit(id) {
+  if (!isAdmin) return;
   const a = accounts.find(x => x.id === id);
   if (!a) return;
   editingId = id;
@@ -790,34 +801,37 @@ function openEdit(id) {
   setTimeout(() => document.getElementById('mName').focus(), 50);
 }
 
-function saveAccount() {
+async function saveAccount() {
+  if (!isAdmin) return;
   const name = document.getElementById('mName').value.trim();
   const balance = parseFloat(document.getElementById('mBalance').value);
   if (!name) { document.getElementById('modalError').textContent = 'Name is required.'; return; }
   if (isNaN(balance)) { document.getElementById('modalError').textContent = 'Enter a valid balance.'; return; }
 
-  if (editingId) {
-    const a = accounts.find(x => x.id === editingId);
-    if (a) { a.name = name; a.balance = Math.round(balance*100)/100; }
-    toast(`"${name}" updated ✓`);
-  } else {
-    accounts.push({
-      id: 'acct_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-      name,
-      balance: Math.round(balance*100)/100,
-      lastUpdated: Date.now(),
-      lastChange: 0
-    });
-    toast(`"${name}" added ✓`);
+  try {
+    if (editingId) {
+      await apiCall('PUT', API_URL, { 
+        id: editingId, 
+        name, 
+        balance,
+        lastChange: 0 
+      });
+      toast(`"${name}" updated ✓`);
+    } else {
+      await apiCall('POST', API_URL, { name, balance });
+      toast(`"${name}" added ✓`);
+    }
+    closeModal('accountModal');
+    await loadData();
+    render();
+  } catch (e) {
+    document.getElementById('modalError').textContent = e.message;
   }
-  saveData();
-  closeModal('accountModal');
-  render();
 }
 
 // Adjust balance
-let adjustingId = null;
 function openAdjust(id) {
+  if (!isAdmin) return;
   const a = accounts.find(x => x.id === id);
   if (!a) return;
   adjustingId = id;
@@ -829,23 +843,34 @@ function openAdjust(id) {
   setTimeout(() => document.getElementById('aAmount').focus(), 50);
 }
 
-function saveAdjust() {
+async function saveAdjust() {
+  if (!isAdmin) return;
   const amount = parseFloat(document.getElementById('aAmount').value);
   if (isNaN(amount) || amount === 0) {
-    document.getElementById('adjustError').textContent = 'Enter a non-zero amount.'; return;
+    document.getElementById('adjustError').textContent = 'Enter a non-zero amount.';
+    return;
   }
-  const a = accounts.find(x => x.id === adjustingId);
-  if (!a) return;
-  a.lastChange = Math.round(amount * 100) / 100;
-  a.balance = Math.round((a.balance + amount) * 100) / 100;
-  saveData();
-  closeModal('adjustModal');
-  render();
-  toast(`Balance ${amount >= 0 ? 'increased' : 'decreased'} by ${fmt(Math.abs(amount))} ✓`);
+  try {
+    const a = accounts.find(x => x.id === adjustingId);
+    if (!a) return;
+    const newBalance = Math.round((a.balance + amount) * 100) / 100;
+    await apiCall('PUT', API_URL, { 
+      id: adjustingId, 
+      balance: newBalance,
+      lastChange: Math.round(amount * 100) / 100
+    });
+    closeModal('adjustModal');
+    await loadData();
+    render();
+    toast(`Balance ${amount >= 0 ? 'increased' : 'decreased'} by ${fmt(Math.abs(amount))} ✓`);
+  } catch (e) {
+    document.getElementById('adjustError').textContent = e.message;
+  }
 }
 
 // Delete
 function openDelete(id) {
+  if (!isAdmin) return;
   const a = accounts.find(x => x.id === id);
   if (!a) return;
   deletingId = id;
@@ -853,14 +878,18 @@ function openDelete(id) {
   openModal('deleteModal');
 }
 
-function confirmDelete() {
+async function confirmDelete() {
+  if (!isAdmin) return;
   const a = accounts.find(x => x.id === deletingId);
-  if (a) {
-    accounts = accounts.filter(x => x.id !== deletingId);
-    saveData();
+  if (!a) return;
+  try {
+    await apiCall('DELETE', API_URL, { id: deletingId });
     closeModal('deleteModal');
+    await loadData();
     render();
     toast(`"${a.name}" removed`);
+  } catch (e) {
+    toast('Delete failed: ' + e.message);
   }
 }
 
@@ -882,16 +911,38 @@ document.getElementById('mName').addEventListener('keydown', e => { if(e.key==='
 document.getElementById('aAmount').addEventListener('keydown', e => { if(e.key==='Enter') saveAdjust(); });
 
 // ════════════════════════════════════════════════
-//  INIT — auto-refresh every minute to update countdown
+//  INIT
 // ════════════════════════════════════════════════
-function init() {
-  loadData();
-  const changed = applyAccruedInterest();
-  if (changed) toast("Interest applied to accounts ✓");
-  render();
-  // Refresh countdowns every 60 seconds
-  setInterval(() => {
-    applyAccruedInterest();
+async function init() {
+  // Check if already authenticated via token
+  if (authToken) {
+    try {
+      // Verify token by trying to load data with auth
+      await loadData();
+      isAdmin = true;
+      document.getElementById('authArea').style.display = 'none';
+      document.getElementById('adminBadge').style.display = '';
+      document.getElementById('lockBtn').style.display = '';
+      document.getElementById('addBtn').style.display = '';
+      document.getElementById('interestBtn').style.display = '';
+      document.getElementById('actionsHeader').style.display = '';
+      render();
+    } catch(e) {
+      // Token invalid
+      authToken = '';
+      localStorage.removeItem('authToken');
+      isAdmin = false;
+      await loadData();
+      render();
+    }
+  } else {
+    await loadData();
+    render();
+  }
+
+  // Refresh every 60 seconds
+  setInterval(async () => {
+    await loadData();
     render();
   }, 60 * 1000);
 }
