@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0f0e;
+    --surface:   #141817;
+    --border:    #232927;
+    --border2:   #2e3431;
+    --green:     #00c853;
+    --green-dim: #00832e;
+    --red:       #ff3b30;
+    --red-dim:   #8b1a14;
+    --text:      #f0ede8;
+    --text-dim:  #7a8580;
+    --text-mid:  #b0b8b4;
+    --accent:    #00c853;
+    --row-hover: #1a1f1e;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--green);
+  }
+  .logo span { color: var(--text-dim); font-weight: 400; }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .auth-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .auth-input {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    outline: none;
+    width: 180px;
+    transition: border-color 0.2s;
+  }
+  .auth-input::placeholder { color: var(--text-dim); }
+  .auth-input:focus { border-color: var(--green-dim); }
+
+  .btn {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s, background 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { opacity: 0.7; }
+
+  .btn-primary { background: var(--green); color: #000; }
+  .btn-ghost   { background: transparent; color: var(--text-dim); border: 1px solid var(--border2); }
+  .btn-danger  { background: var(--red); color: #fff; }
+  .btn-sm { padding: 5px 11px; font-size: 12px; }
+
+  .admin-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    border: 1px solid var(--green-dim);
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(0,200,83,0.07);
+  }
+
+  /* ── SUMMARY BAR ── */
+  .summary-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    overflow-x: auto;
+  }
+
+  .stat-cell {
+    padding: 18px 28px 18px 0;
+    margin-right: 28px;
+    border-right: 1px solid var(--border);
+    min-width: 140px;
+  }
+  .stat-cell:last-child { border-right: none; }
+
+  .stat-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .stat-value.pos { color: var(--green); }
+  .stat-value.neg { color: var(--red); }
+  .stat-value.neutral { color: var(--text); }
+
+  /* ── MAIN TABLE ── */
+  .table-wrapper {
+    padding: 0 32px 32px;
+    overflow-x: auto;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0 14px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .section-title {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+  }
+
+  thead th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: left;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border2);
+    white-space: nowrap;
+    background: var(--bg);
+  }
+
+  thead th.num { text-align: right; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.12s;
+    cursor: default;
+  }
+
+  tbody tr:hover { background: var(--row-hover); }
+
+  tbody td {
+    padding: 14px 16px;
+    font-size: 14px;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  .col-idx {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    width: 40px;
+  }
+
+  .col-name {
+    font-weight: 500;
+    color: var(--text);
+    min-width: 160px;
+  }
+
+  .col-name small {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .col-balance {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: right;
+  }
+  .col-balance.pos { color: var(--green); }
+  .col-balance.neg { color: var(--red); }
+
+  .col-change {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    text-align: right;
+    color: var(--text-dim);
+  }
+
+  .col-updated {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 130px;
+  }
+
+  .col-actions {
+    text-align: right;
+    width: 1%;
+  }
+
+  .action-btns {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  tr:hover .action-btns { opacity: 1; }
+
+  /* interest tag */
+  .interest-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-left: 8px;
+    font-weight: 500;
+  }
+  .interest-tag.accrued { background: rgba(0,200,83,0.12); color: var(--green); }
+  .interest-tag.debt    { background: rgba(255,59,48,0.12); color: var(--red); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    padding: 60px 16px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; margin-bottom: 18px; }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 32px;
+    width: 100%;
+    max-width: 420px;
+    position: relative;
+  }
+
+  .modal h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .modal .modal-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+  }
+
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    padding: 10px 14px;
+    border-radius: 7px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--green-dim); }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 24px;
+  }
+
+  .close-modal {
+    position: absolute;
+    top: 16px; right: 18px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+  }
+  .close-modal:hover { color: var(--text); }
+
+  .error-msg {
+    font-size: 12px;
+    color: var(--red);
+    margin-top: 8px;
+    min-height: 16px;
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 11px 22px;
+    border-radius: 8px;
+    z-index: 9999;
+    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── WEEKLY NOTE ── */
+  .weekly-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 10px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .weekly-note .dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; } 50% { opacity:0.3; }
+  }
+
+  @media (max-width: 640px) {
+    header { padding: 14px 16px; }
+    .summary-bar, .table-wrapper { padding-left: 16px; padding-right: 16px; }
+    .stat-cell { padding: 14px 16px 14px 0; min-width: 110px; }
+    .auth-input { width: 130px; }
+    .weekly-note { padding: 10px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">LEDGER<span>.db</span></div>
+  <div class="header-right">
+    <div id="adminBadge" class="admin-badge" style="display:none">✦ ADMIN</div>
+    <div class="auth-area" id="authArea">
+      <input class="auth-input" type="password" id="pwInput" placeholder="Enter password…" autocomplete="current-password" />
+      <button class="btn btn-primary btn-sm" onclick="tryAuth()">Unlock</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="lockBtn" style="display:none" onclick="lock()">Lock</button>
+  </div>
+</header>
+
+<!-- WEEKLY NOTE -->
+<div class="weekly-note">
+  <div class="dot"></div>
+  <span id="weeklyNote">Balances grow at +10% per week (compounding). Interest applies to debt too.</span>
+</div>
+
+<!-- SUMMARY BAR -->
+<div class="summary-bar" id="summaryBar"></div>
+
+<!-- MAIN CONTENT -->
+<div class="table-wrapper">
+  <div class="controls">
+    <span class="section-title" id="accountCount">— accounts</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="applyInterestManually()" id="interestBtn" style="display:none">⟳ Apply Interest Now</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()" id="addBtn" style="display:none">+ Add Account</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Account</th>
+        <th class="num">Balance</th>
+        <th class="num">Last Change</th>
+        <th>Last Updated</th>
+        <th class="num" id="actionsHeader" style="display:none">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <div class="empty-state" id="emptyState" style="display:none">
+    <div class="icon">📋</div>
+    <p>No accounts yet.</p>
+    <button class="btn btn-primary" onclick="openAddModal()">Add First Account</button>
+  </div>
+</div>
+
+<!-- SUMMARY TOTAL ROW (footer) -->
+
+<!-- MODAL: Add / Edit Account -->
+<div class="modal-backdrop" id="accountModal">
+  <div class="modal">
+    <button class="close-modal" onclick="closeModal('accountModal')">×</button>
+    <h2 id="modalTitle">New Account</h2>
+    <p class="modal-sub" id="modalSub">Add a new account to the ledger.</p>
+    <div class="field">
+      <label>Account Name</label>
+      <input type="text" id="mName" placeholder="e.g. Alice" />
+    </div>
+    <div class="field">
+      <label>Starting Balance</label>
+      <input type="number" id="mBalance" placeholder="0.00" step="0.01" />
+    </div>
+    <div class="error-msg" id="modalError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('accountModal')">Cancel</button>
+      <button class="btn btn-primary" id="modalSaveBtn" onclick="saveAccount()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Adjust Balance -->
+<div class="modal-backdrop" id="adjustModal">
+  <div class="modal">
+    <button class="close-modal" onclick="closeModal('adjustModal')">×</button>
+    <h2 id="adjustTitle">Adjust Balance</h2>
+    <p class="modal-sub" id="adjustSub">Current: <strong id="adjustCurrent"></strong></p>
+    <div class="field">
+      <label>Amount (use − for deduction)</label>
+      <input type="number" id="aAmount" placeholder="e.g. 500 or -200" step="0.01" />
+    </div>
+    <div class="error-msg" id="adjustError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('adjustModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAdjust()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Confirm Delete -->
+<div class="modal-backdrop" id="deleteModal">
+  <div class="modal">
+    <button class="close-modal" onclick="closeModal('deleteModal')">×</button>
+    <h2>Remove Account?</h2>
+    <p class="modal-sub">This will permanently remove <strong id="deleteName"></strong> from the ledger. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════
+//  CONFIG — change password here
+// ════════════════════════════════════════════════
+const PASSWORD = "admin123";       // ← change this
+const INTEREST_RATE = 0.10;        // 10% per week
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// ════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════
+let isAdmin = false;
+let accounts = [];          // [{id, name, balance, lastUpdated, lastChange}]
+let editingId = null;
+let deletingId = null;
+
+// ════════════════════════════════════════════════
+//  PERSISTENCE
+// ════════════════════════════════════════════════
+function loadData() {
+  try {
+    const raw = localStorage.getItem('ledger_accounts');
+    accounts = raw ? JSON.parse(raw) : [];
+    // migrate old entries without lastChange
+    accounts.forEach(a => {
+      if (a.lastChange === undefined) a.lastChange = 0;
+    });
+  } catch(e) { accounts = []; }
+}
+
+function saveData() {
+  localStorage.setItem('ledger_accounts', JSON.stringify(accounts));
+}
+
+// ════════════════════════════════════════════════
+//  INTEREST LOGIC
+// ════════════════════════════════════════════════
+function applyAccruedInterest() {
+  const now = Date.now();
+  let changed = false;
+  accounts.forEach(a => {
+    const elapsed = now - a.lastUpdated;
+    const weeksElapsed = Math.floor(elapsed / WEEK_MS);
+    if (weeksElapsed >= 1) {
+      const oldBalance = a.balance;
+      // Compound for each week
+      let b = a.balance;
+      for (let w = 0; w < weeksElapsed; w++) {
+        b = b >= 0 ? b * (1 + INTEREST_RATE) : b * (1 + INTEREST_RATE);
+      }
+      b = Math.round(b * 100) / 100;
+      a.lastChange = b - oldBalance;
+      a.balance = b;
+      // Advance lastUpdated by the exact weeks applied (not to now)
+      a.lastUpdated += weeksElapsed * WEEK_MS;
+      changed = true;
+    }
+  });
+  if (changed) saveData();
+  return changed;
+}
+
+function applyInterestManually() {
+  // Force apply one week of interest immediately for testing/admin
+  const now = Date.now();
+  accounts.forEach(a => {
+    const oldBalance = a.balance;
+    let b = a.balance;
+    b = Math.round(b * (1 + INTEREST_RATE) * 100) / 100;
+    a.lastChange = b - oldBalance;
+    a.balance = b;
+    a.lastUpdated = now;
+  });
+  saveData();
+  render();
+  toast("Interest applied to all accounts ✓");
+}
+
+// ════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════
+function tryAuth() {
+  const val = document.getElementById('pwInput').value;
+  if (val === PASSWORD) {
+    isAdmin = true;
+    document.getElementById('authArea').style.display = 'none';
+    document.getElementById('adminBadge').style.display = '';
+    document.getElementById('lockBtn').style.display = '';
+    document.getElementById('addBtn').style.display = '';
+    document.getElementById('interestBtn').style.display = '';
+    document.getElementById('actionsHeader').style.display = '';
+    document.getElementById('pwInput').value = '';
+    render();
+    toast("Admin access granted ✓");
+  } else {
+    document.getElementById('pwInput').style.borderColor = 'var(--red)';
+    setTimeout(() => document.getElementById('pwInput').style.borderColor = '', 1200);
+  }
+}
+
+document.getElementById('pwInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryAuth();
+});
+
+function lock() {
+  isAdmin = false;
+  document.getElementById('authArea').style.display = '';
+  document.getElementById('adminBadge').style.display = 'none';
+  document.getElementById('lockBtn').style.display = 'none';
+  document.getElementById('addBtn').style.display = 'none';
+  document.getElementById('interestBtn').style.display = 'none';
+  document.getElementById('actionsHeader').style.display = 'none';
+  render();
+}
+
+// ════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════
+function fmt(n) {
+  const sign = n < 0 ? '−' : '';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function fmtChange(n) {
+  if (n === 0) return '—';
+  const sign = n > 0 ? '+' : '−';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function fmtDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) +
+    ' ' + d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+}
+
+function nextInterestIn(ts) {
+  const elapsed = Date.now() - ts;
+  const remaining = WEEK_MS - (elapsed % WEEK_MS);
+  const d = Math.floor(remaining / (24*60*60*1000));
+  const h = Math.floor((remaining % (24*60*60*1000)) / (60*60*1000));
+  if (d > 0) return `+10% in ${d}d ${h}h`;
+  return `+10% in ${h}h`;
+}
+
+function render() {
+  const tbody = document.getElementById('tableBody');
+  const emptyState = document.getElementById('emptyState');
+  const summaryBar = document.getElementById('summaryBar');
+  const accountCount = document.getElementById('accountCount');
+
+  // Summary
+  const total = accounts.reduce((s, a) => s + a.balance, 0);
+  const inDebt = accounts.filter(a => a.balance < 0).length;
+  const positive = accounts.filter(a => a.balance >= 0).length;
+
+  accountCount.textContent = `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
+
+  summaryBar.innerHTML = `
+    <div class="stat-cell">
+      <div class="stat-label">Total Balance</div>
+      <div class="stat-value ${total >= 0 ? 'pos' : 'neg'}">${fmt(total)}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Accounts</div>
+      <div class="stat-value neutral">${accounts.length}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">In Credit</div>
+      <div class="stat-value pos">${positive}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">In Debt</div>
+      <div class="stat-value ${inDebt > 0 ? 'neg' : 'neutral'}">${inDebt}</div>
+    </div>
+  `;
+
+  if (accounts.length === 0) {
+    tbody.innerHTML = '';
+    emptyState.style.display = isAdmin ? '' : 'block';
+    emptyState.querySelector('button').style.display = isAdmin ? '' : 'none';
+    return;
+  }
+  emptyState.style.display = 'none';
+
+  tbody.innerHTML = accounts.map((a, i) => {
+    const isPos = a.balance >= 0;
+    const changeClass = a.lastChange > 0 ? 'pos' : a.lastChange < 0 ? 'neg' : '';
+    const actionBtns = isAdmin ? `
+      <div class="action-btns">
+        <button class="btn btn-ghost btn-sm" onclick="openAdjust('${a.id}')">± Adjust</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEdit('${a.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="openDelete('${a.id}')">✕</button>
+      </div>` : '';
+
+    return `<tr>
+      <td class="col-idx">${i + 1}</td>
+      <td class="col-name">
+        ${a.name}
+        <small>${nextInterestIn(a.lastUpdated)}</small>
+      </td>
+      <td class="col-balance ${isPos ? 'pos' : 'neg'}">${fmt(a.balance)}</td>
+      <td class="col-change" style="color:${a.lastChange > 0 ? 'var(--green)' : a.lastChange < 0 ? 'var(--red)' : 'var(--text-dim)'}">${fmtChange(a.lastChange)}</td>
+      <td class="col-updated">${fmtDate(a.lastUpdated)}</td>
+      ${isAdmin ? `<td class="col-actions">${actionBtns}</td>` : ''}
+    </tr>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════
+//  MODALS
+// ════════════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  document.getElementById('modalError') && (document.getElementById('modalError').textContent = '');
+  document.getElementById('adjustError') && (document.getElementById('adjustError').textContent = '');
+}
+
+// Close on backdrop click
+document.querySelectorAll('.modal-backdrop').forEach(b => {
+  b.addEventListener('click', e => { if (e.target === b) closeModal(b.id); });
+});
+
+// Add Account
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'New Account';
+  document.getElementById('modalSub').textContent = 'Add a new account to the ledger.';
+  document.getElementById('mName').value = '';
+  document.getElementById('mBalance').value = '';
+  document.getElementById('modalError').textContent = '';
+  openModal('accountModal');
+  setTimeout(() => document.getElementById('mName').focus(), 50);
+}
+
+// Edit Account
+function openEdit(id) {
+  const a = accounts.find(x => x.id === id);
+  if (!a) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'Edit Account';
+  document.getElementById('modalSub').textContent = `Editing "${a.name}"`;
+  document.getElementById('mName').value = a.name;
+  document.getElementById('mBalance').value = a.balance;
+  document.getElementById('modalError').textContent = '';
+  openModal('accountModal');
+  setTimeout(() => document.getElementById('mName').focus(), 50);
+}
+
+function saveAccount() {
+  const name = document.getElementById('mName').value.trim();
+  const balance = parseFloat(document.getElementById('mBalance').value);
+  if (!name) { document.getElementById('modalError').textContent = 'Name is required.'; return; }
+  if (isNaN(balance)) { document.getElementById('modalError').textContent = 'Enter a valid balance.'; return; }
+
+  if (editingId) {
+    const a = accounts.find(x => x.id === editingId);
+    if (a) { a.name = name; a.balance = Math.round(balance*100)/100; }
+    toast(`"${name}" updated ✓`);
+  } else {
+    accounts.push({
+      id: 'acct_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      name,
+      balance: Math.round(balance*100)/100,
+      lastUpdated: Date.now(),
+      lastChange: 0
+    });
+    toast(`"${name}" added ✓`);
+  }
+  saveData();
+  closeModal('accountModal');
+  render();
+}
+
+// Adjust balance
+let adjustingId = null;
+function openAdjust(id) {
+  const a = accounts.find(x => x.id === id);
+  if (!a) return;
+  adjustingId = id;
+  document.getElementById('adjustTitle').textContent = `Adjust: ${a.name}`;
+  document.getElementById('adjustCurrent').textContent = fmt(a.balance);
+  document.getElementById('aAmount').value = '';
+  document.getElementById('adjustError').textContent = '';
+  openModal('adjustModal');
+  setTimeout(() => document.getElementById('aAmount').focus(), 50);
+}
+
+function saveAdjust() {
+  const amount = parseFloat(document.getElementById('aAmount').value);
+  if (isNaN(amount) || amount === 0) {
+    document.getElementById('adjustError').textContent = 'Enter a non-zero amount.'; return;
+  }
+  const a = accounts.find(x => x.id === adjustingId);
+  if (!a) return;
+  a.lastChange = Math.round(amount * 100) / 100;
+  a.balance = Math.round((a.balance + amount) * 100) / 100;
+  saveData();
+  closeModal('adjustModal');
+  render();
+  toast(`Balance ${amount >= 0 ? 'increased' : 'decreased'} by ${fmt(Math.abs(amount))} ✓`);
+}
+
+// Delete
+function openDelete(id) {
+  const a = accounts.find(x => x.id === id);
+  if (!a) return;
+  deletingId = id;
+  document.getElementById('deleteName').textContent = a.name;
+  openModal('deleteModal');
+}
+
+function confirmDelete() {
+  const a = accounts.find(x => x.id === deletingId);
+  if (a) {
+    accounts = accounts.filter(x => x.id !== deletingId);
+    saveData();
+    closeModal('deleteModal');
+    render();
+    toast(`"${a.name}" removed`);
+  }
+}
+
+// ════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// Enter key in modals
+document.getElementById('mBalance').addEventListener('keydown', e => { if(e.key==='Enter') saveAccount(); });
+document.getElementById('mName').addEventListener('keydown', e => { if(e.key==='Enter') saveAccount(); });
+document.getElementById('aAmount').addEventListener('keydown', e => { if(e.key==='Enter') saveAdjust(); });
+
+// ════════════════════════════════════════════════
+//  INIT — auto-refresh every minute to update countdown
+// ════════════════════════════════════════════════
+function init() {
+  loadData();
+  const changed = applyAccruedInterest();
+  if (changed) toast("Interest applied to accounts ✓");
+  render();
+  // Refresh countdowns every 60 seconds
+  setInterval(() => {
+    applyAccruedInterest();
+    render();
+  }, 60 * 1000);
+}
+
+init();
+</script>
+</body>
+</html>
