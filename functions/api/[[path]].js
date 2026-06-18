@@ -93,8 +93,8 @@ export async function onRequest(context) {
   const accessKey = request.headers.get("X-Access-Key") || "";
   const adminKey  = request.headers.get("X-Admin-Key")  || "";
 
-  const validAccess = () => accessKey === (env.ACCESS_KEY || "");
-  const validAdmin  = () => adminKey  === (env.PASSWORD  || "");
+  const validAccess = () => accessKey === "ABTP";
+  const validAdmin  = () => adminKey  === "BDTP";
 
   // ── DB init ──
   const db = env.DB;
