@@ -112,7 +112,6 @@ export async function onRequest(context) {
   // POST /api/auth/admin
   if (parts[0] === "auth" && parts[1] === "admin" && method === "POST") {
     const body = await request.json().catch(() => ({}));
-    if (!validAccess()) return err("Access denied", 401);
     if (body.key === (env.PASSWORD || "")) return json({ ok: true });
     return err("Invalid admin password", 401);
   }
