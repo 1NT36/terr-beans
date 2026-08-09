@@ -28,7 +28,6 @@ async function initDB(db) {
     )`
   ).run();
 
-  // Ensure the system account exists
   const sys = await db.prepare("SELECT id FROM accounts WHERE id = 'system'").first();
   if (!sys) {
     await db.prepare(
@@ -38,7 +37,7 @@ async function initDB(db) {
   }
 }
 
-// ─── Interest logic (updated) ─────────────────────────────────────
+// ─── Interest logic ──────────────────────────────────────────────
 const POS_PERIOD_MS = 16 * 3600 * 1000;   // 16 hours
 const POS_RATE      = 0.01;              // 1%
 const NEG_PERIOD_MS = 24 * 3600 * 1000;  // 24 hours
@@ -85,8 +84,7 @@ async function applyAccruedInterest(db) {
 
 // ─── Tax on positive adjustment ──────────────────────────────────
 function applyTax(amount) {
-  if (amount <= 0) return amount; // no tax on negative or zero
-  // tax = 10 * log11(amount+1) percent
+  if (amount <= 0) return amount;
   const taxPercent = 10 * Math.log10(amount + 1) / Math.log10(11);
   const tax = amount * (taxPercent / 100);
   return Math.round((amount - tax) * 100) / 100;
@@ -99,8 +97,8 @@ function newId() {
 
 // ─── The full app HTML (served after authentication) ────────────
 function getAppHTML(accessKey) {
-  // We inject the access key into the frontend JavaScript so it can make API calls.
-  // The HTML is a template literal with the key already inserted.
+  // IMPORTANT: escape the access key for safe injection
+  const safeKey = JSON.stringify(accessKey);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -510,10 +508,7 @@ tr:hover .action-btns { opacity: 1; }
 </head>
 <body>
 
-<!-- ══ APP ════════════════════════════════════════════════════ -->
 <div id="app">
-
-  <!-- HEADER -->
   <header>
     <div class="logo">LEDGER<span>.db</span></div>
     <div class="header-right">
@@ -526,16 +521,13 @@ tr:hover .action-btns { opacity: 1; }
     </div>
   </header>
 
-  <!-- WEEKLY NOTE -->
   <div class="weekly-note">
     <div class="dot"></div>
     <span>Interest: +1% every 16h on positive balances, +2% every 24h on debts. System account excluded.</span>
   </div>
 
-  <!-- SUMMARY BAR -->
   <div class="summary-bar" id="summaryBar"></div>
 
-  <!-- TABLE -->
   <div class="table-wrapper">
     <div class="controls">
       <span class="section-title" id="accountCount">Loading…</span>
@@ -567,10 +559,9 @@ tr:hover .action-btns { opacity: 1; }
       <button class="btn btn-primary" onclick="openAddModal()">Add First Account</button>
     </div>
   </div>
+</div>
 
-</div><!-- /app -->
-
-<!-- MODAL: Add / Edit -->
+<!-- Modals -->
 <div class="modal-backdrop" id="accountModal">
   <div class="modal">
     <button class="close-modal" onclick="closeModal('accountModal')">×</button>
@@ -586,7 +577,6 @@ tr:hover .action-btns { opacity: 1; }
   </div>
 </div>
 
-<!-- MODAL: Adjust -->
 <div class="modal-backdrop" id="adjustModal">
   <div class="modal">
     <button class="close-modal" onclick="closeModal('adjustModal')">×</button>
@@ -601,7 +591,6 @@ tr:hover .action-btns { opacity: 1; }
   </div>
 </div>
 
-<!-- MODAL: Delete -->
 <div class="modal-backdrop" id="deleteModal">
   <div class="modal">
     <button class="close-modal" onclick="closeModal('deleteModal')">×</button>
@@ -614,12 +603,11 @@ tr:hover .action-btns { opacity: 1; }
   </div>
 </div>
 
-<!-- TOAST -->
 <div id="toast"></div>
 
 <script>
-// ─── Access key injected from server ──────────────────────
-const ACCESS_KEY = '${accessKey}';
+// ─── Access key injected from server (safe) ──────────────────
+const ACCESS_KEY = ${safeKey};
 
 // ─── STATE ────────────────────────────────────────────────
 let adminKey  = "";
@@ -814,7 +802,7 @@ function nextInterestText(lastUpdated, balance) {
   return `+${rate}% in ${min}m`;
 }
 
-// ─── INTEREST (manual trigger) ──────────────────────────
+// ─── INTEREST (manual) ──────────────────────────────────
 async function applyInterestNow() {
   try {
     await api("POST", "accounts/interest");
@@ -835,7 +823,6 @@ document.querySelectorAll('.modal-backdrop').forEach(b => {
   b.addEventListener('click', e => { if(e.target === b) closeModal(b.id); });
 });
 
-// Add
 function openAddModal() {
   editingId = null;
   document.getElementById('modalTitle').textContent = 'New Account';
@@ -847,7 +834,6 @@ function openAddModal() {
   setTimeout(() => document.getElementById('mName').focus(), 50);
 }
 
-// Edit
 function openEdit(id) {
   const a = accounts.find(x => x.id === id); if(!a) return;
   editingId = id;
@@ -879,7 +865,6 @@ async function saveAccount() {
   } catch(e) { errEl.textContent = e.message; }
 }
 
-// Adjust
 function openAdjust(id) {
   const a = accounts.find(x => x.id === id); if(!a) return;
   adjustingId = id;
@@ -903,7 +888,6 @@ async function saveAdjust() {
   } catch(e) { errEl.textContent = e.message; }
 }
 
-// Delete
 function openDelete(id) {
   const a = accounts.find(x => x.id === id); if(!a) return;
   deletingId = id;
@@ -921,7 +905,6 @@ async function confirmDelete() {
   } catch(e) { toast("Error: " + e.message); }
 }
 
-// Enter key shortcuts
 document.getElementById('mBalance').addEventListener('keydown', e => { if(e.key==='Enter') saveAccount(); });
 document.getElementById('mName').addEventListener('keydown',    e => { if(e.key==='Enter') saveAccount(); });
 document.getElementById('aAmount').addEventListener('keydown',  e => { if(e.key==='Enter') saveAdjust(); });
@@ -964,15 +947,12 @@ export async function onRequest(context) {
   const validAdmin  = () => adminKey  === env.PASSWORD;
 
   // ─── Public routes ──────────────────────────────────────────
-
-  // POST /api/auth/access – validate key (no DB needed)
   if (parts[0] === "auth" && parts[1] === "access" && method === "POST") {
     const body = await request.json().catch(() => ({}));
     if (body.key === env.ACCESS_KEY) return json({ ok: true });
     return err("Invalid access key", 401);
   }
 
-  // POST /api/auth/admin – validate admin password
   if (parts[0] === "auth" && parts[1] === "admin" && method === "POST") {
     const body = await request.json().catch(() => ({}));
     if (body.key === env.PASSWORD) return json({ ok: true });
@@ -985,7 +965,7 @@ export async function onRequest(context) {
   const db = env.DB;
   await initDB(db);
 
-  // GET /api/app – serve the full app HTML (only after access)
+  // GET /api/app – serve the full app HTML
   if (parts[0] === "app" && !parts[1] && method === "GET") {
     const html = getAppHTML(accessKey);
     return new Response(html, {
@@ -993,16 +973,14 @@ export async function onRequest(context) {
     });
   }
 
-  // ─── CRUD for accounts ────────────────────────────────────
+  // ─── CRUD ──────────────────────────────────────────────────
 
-  // GET /api/accounts
   if (parts[0] === "accounts" && !parts[1] && method === "GET") {
     await applyAccruedInterest(db);
     const rows = await db.prepare("SELECT * FROM accounts ORDER BY rowid ASC").all();
     return json({ accounts: rows.results });
   }
 
-  // POST /api/accounts
   if (parts[0] === "accounts" && !parts[1] && method === "POST") {
     if (!validAdmin()) return err("Admin required", 403);
     const body = await request.json().catch(() => ({}));
@@ -1018,22 +996,19 @@ export async function onRequest(context) {
     return json({ ok: true, id });
   }
 
-  // POST /api/accounts/interest – manual interest
   if (parts[0] === "accounts" && parts[1] === "interest" && method === "POST") {
     if (!validAdmin()) return err("Admin required", 403);
-    await applyAccruedInterest(db); // forces all accrued interest to be applied
+    await applyAccruedInterest(db);
     return json({ ok: true });
   }
 
-  // PUT /api/accounts/:id
   if (parts[0] === "accounts" && parts[1] && method === "PUT") {
     if (!validAdmin()) return err("Admin required", 403);
     const id = parts[1];
     const body = await request.json().catch(() => ({}));
     const row = await db.prepare("SELECT * FROM accounts WHERE id=?").bind(id).first();
     if (!row) return err("Not found", 404);
-    // System account cannot be renamed? We'll allow but we could restrict.
-    const name    = (body.name !== undefined ? body.name : row.name).trim();
+    const name = (body.name !== undefined ? body.name : row.name).trim();
     const balance = body.balance !== undefined ? parseFloat(body.balance) : row.balance;
     if (!name) return err("Name required");
     if (isNaN(balance)) return err("Invalid balance");
@@ -1043,7 +1018,6 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
 
-  // POST /api/accounts/:id/adjust – with tax on positive amounts
   if (parts[0] === "accounts" && parts[1] && parts[2] === "adjust" && method === "POST") {
     if (!validAdmin()) return err("Admin required", 403);
     const id = parts[1];
@@ -1054,7 +1028,6 @@ export async function onRequest(context) {
     const row = await db.prepare("SELECT * FROM accounts WHERE id=?").bind(id).first();
     if (!row) return err("Not found", 404);
 
-    // Apply tax only for positive amounts
     let actualChange = amount;
     if (amount > 0) {
       actualChange = applyTax(amount);
@@ -1067,7 +1040,6 @@ export async function onRequest(context) {
     return json({ ok: true, balance: newBalance, actualChange });
   }
 
-  // DELETE /api/accounts/:id – cannot delete system account
   if (parts[0] === "accounts" && parts[1] && method === "DELETE") {
     if (!validAdmin()) return err("Admin required", 403);
     const id = parts[1];
