@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ledger · Gate</title>
+  <title>Ledger · ABTP</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <style>
@@ -80,7 +80,7 @@
     .gate-error {
       font-size: 12px;
       color: #ff3b30;
-      height: 16px;
+      height: 20px;
       margin-bottom: 6px;
     }
     .btn {
@@ -97,7 +97,24 @@
     .btn:active { opacity: 0.65; }
     .btn-primary { background: #00c853; color: #000; }
     .btn-full { width: 100%; padding: 13px; font-size: 14px; font-weight: 600; }
-    #loading { margin-top: 20px; color: #7a8580; font-size: 13px; display: none; }
+    #loading {
+      margin-top: 16px;
+      color: #7a8580;
+      font-size: 13px;
+      display: none;
+    }
+    #loading .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #2e3431;
+      border-top-color: #00c853;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -110,7 +127,7 @@
     </div>
     <div class="gate-error" id="gateError"></div>
     <button class="btn btn-primary btn-full" id="gateBtn">Enter</button>
-    <div id="loading">Loading ledger…</div>
+    <div id="loading"><span class="spinner"></span> Loading ledger…</div>
   </div>
 
   <script>
@@ -123,32 +140,42 @@
 
     async function submitGate() {
       const key = input.value.trim();
-      if (!key) return;
+      if (!key) {
+        err.textContent = 'Please enter an access key.';
+        return;
+      }
       btn.disabled = true;
       btn.textContent = 'Checking…';
       err.textContent = '';
       loading.style.display = 'block';
 
       try {
+        // 1) Validate access key
         const res = await fetch('/api/auth/access', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key })
         });
-        if (!res.ok) throw new Error('Invalid access key');
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Invalid access key');
+        }
 
-        // Fetch the full app HTML
+        // 2) Fetch the full app HTML
         const appRes = await fetch('/api/app', {
           headers: { 'X-Access-Key': key }
         });
-        if (!appRes.ok) throw new Error('Failed to load application');
+        if (!appRes.ok) {
+          const data = await appRes.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to load application');
+        }
 
         const html = await appRes.text();
         document.documentElement.innerHTML = html;
-        // The app script will run immediately after parsing
+        // The app script will run automatically after parsing
 
       } catch (e) {
-        err.textContent = 'Incorrect access key.';
+        err.textContent = e.message || 'Something went wrong.';
         input.classList.add('shake');
         setTimeout(() => input.classList.remove('shake'), 400);
         loading.style.display = 'none';
