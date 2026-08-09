@@ -97,7 +97,6 @@ function newId() {
 
 // ─── The full app HTML (served after authentication) ────────────
 function getAppHTML(accessKey) {
-  // IMPORTANT: escape the access key for safe injection
   const safeKey = JSON.stringify(accessKey);
   return `<!DOCTYPE html>
 <html lang="en">
@@ -619,10 +618,10 @@ let deletingId  = null;
 
 // ─── BEAN SVG ──────────────────────────────────────────────
 function beanSVG(size = 16, color = "currentColor") {
-  return `<span class="bean"><svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <ellipse cx="8" cy="8" rx="5.2" ry="7" transform="rotate(-20 8 8)" fill="${color}" opacity="0.92"/>
-    <path d="M8 2.5 Q5 8 8 13.5" stroke="${color === 'currentColor' ? '#0d0f0e' : '#0d0f0e'}" stroke-width="1.1" stroke-linecap="round" fill="none" opacity="0.55"/>
-  </svg></span>`;
+  return \`<span class="bean"><svg width="\${size}" height="\${size}" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="8" cy="8" rx="5.2" ry="7" transform="rotate(-20 8 8)" fill="\${color}" opacity="0.92"/>
+    <path d="M8 2.5 Q5 8 8 13.5" stroke="\${color === 'currentColor' ? '#0d0f0e' : '#0d0f0e'}" stroke-width="1.1" stroke-linecap="round" fill="none" opacity="0.55"/>
+  </svg></span>\`;
 }
 
 // ─── FORMATTING ──────────────────────────────────────────
@@ -630,7 +629,7 @@ function fmt(n, color) {
   const abs = Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
   const sign = n < 0 ? '−' : '';
   const bColor = color || (n >= 0 ? '#00c853' : '#ff3b30');
-  return `${sign}${abs}${beanSVG(13, bColor)}`;
+  return \`\${sign}\${abs}\${beanSVG(13, bColor)}\`;
 }
 
 function fmtChange(n) {
@@ -638,7 +637,7 @@ function fmtChange(n) {
   const abs = Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
   const sign = n > 0 ? '+' : '−';
   const color = n > 0 ? '#00c853' : '#ff3b30';
-  return `<span style="color:${color}">${sign}${abs}${beanSVG(12, color)}</span>`;
+  return \`<span style="color:\${color}">\${sign}\${abs}\${beanSVG(12, color)}</span>\`;
 }
 
 function fmtDate(ts) {
@@ -711,7 +710,7 @@ async function loadAccounts() {
     render();
   } catch(e) {
     document.getElementById('tableBody').innerHTML =
-      `<tr class="loading-row"><td colspan="6" style="color:var(--red)">Failed to load: ${e.message}</td></tr>`;
+      \`<tr class="loading-row"><td colspan="6" style="color:var(--red)">Failed to load: \${e.message}</td></tr>\`;
   }
 }
 
@@ -725,27 +724,27 @@ function render() {
   const inDebt  = accounts.filter(a => a.balance < 0).length;
   const inCredit= accounts.filter(a => a.balance >= 0).length;
 
-  countEl.textContent = `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
+  countEl.textContent = \`\${accounts.length} account\${accounts.length !== 1 ? 's' : ''}\`;
 
   const totalColor = total >= 0 ? '#00c853' : '#ff3b30';
-  summaryBar.innerHTML = `
+  summaryBar.innerHTML = \`
     <div class="stat-cell">
       <div class="stat-label">Total Balance</div>
-      <div class="stat-value ${total >= 0 ? 'pos':'neg'}">${fmt(total, totalColor)}</div>
+      <div class="stat-value \${total >= 0 ? 'pos':'neg'}">\${fmt(total, totalColor)}</div>
     </div>
     <div class="stat-cell">
       <div class="stat-label">Accounts</div>
-      <div class="stat-value neutral">${accounts.length}</div>
+      <div class="stat-value neutral">\${accounts.length}</div>
     </div>
     <div class="stat-cell">
       <div class="stat-label">In Credit</div>
-      <div class="stat-value pos">${inCredit}</div>
+      <div class="stat-value pos">\${inCredit}</div>
     </div>
     <div class="stat-cell">
       <div class="stat-label">In Debt</div>
-      <div class="stat-value ${inDebt > 0 ? 'neg':'neutral'}">${inDebt}</div>
+      <div class="stat-value \${inDebt > 0 ? 'neg':'neutral'}">\${inDebt}</div>
     </div>
-  `;
+  \`;
 
   if (accounts.length === 0) {
     tbody.innerHTML = '';
@@ -758,22 +757,22 @@ function render() {
   tbody.innerHTML = accounts.map((a, i) => {
     const isPos = a.balance >= 0;
     const isSystem = a.is_system === 1;
-    const actions = isAdmin && !isSystem ? `
+    const actions = isAdmin && !isSystem ? \`
       <td class="col-actions">
         <div class="action-btns">
-          <button class="btn btn-ghost btn-sm" onclick="openAdjust('${a.id}')">± Adjust</button>
-          <button class="btn btn-ghost btn-sm" onclick="openEdit('${a.id}')">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="openDelete('${a.id}')">✕</button>
+          <button class="btn btn-ghost btn-sm" onclick="openAdjust('\${a.id}')">± Adjust</button>
+          <button class="btn btn-ghost btn-sm" onclick="openEdit('\${a.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="openDelete('\${a.id}')">✕</button>
         </div>
-      </td>` : (isAdmin && isSystem ? `<td class="col-actions"><div class="action-btns"><button class="btn btn-ghost btn-sm" onclick="openAdjust('${a.id}')">± Adjust</button></div></td>` : '');
-    return `<tr>
-      <td class="col-idx">${i+1}</td>
-      <td class="col-name">${escHtml(a.name)}${isSystem ? ' <span class="system-tag">System</span>' : ''}<small>${isSystem ? 'No interest' : nextInterestText(a.last_updated, a.balance)}</small></td>
-      <td class="col-balance ${isPos?'pos':'neg'}">${fmt(a.balance)}</td>
-      <td class="col-change">${fmtChange(a.last_change)}</td>
-      <td class="col-updated">${fmtDate(a.last_updated)}</td>
-      ${actions}
-    </tr>`;
+      </td>\` : (isAdmin && isSystem ? \`<td class="col-actions"><div class="action-btns"><button class="btn btn-ghost btn-sm" onclick="openAdjust('\${a.id}')">± Adjust</button></div></td>\` : '');
+    return \`<tr>
+      <td class="col-idx">\${i+1}</td>
+      <td class="col-name">\${escHtml(a.name)}\${isSystem ? ' <span class="system-tag">System</span>' : ''}<small>\${isSystem ? 'No interest' : nextInterestText(a.last_updated, a.balance)}</small></td>
+      <td class="col-balance \${isPos?'pos':'neg'}">\${fmt(a.balance)}</td>
+      <td class="col-change">\${fmtChange(a.last_change)}</td>
+      <td class="col-updated">\${fmtDate(a.last_updated)}</td>
+      \${actions}
+    </tr>\`;
   }).join('');
 }
 
@@ -797,9 +796,9 @@ function nextInterestText(lastUpdated, balance) {
   const d = Math.floor(remaining / (24*3600*1000));
   const h = Math.floor((remaining % (24*3600*1000)) / (3600*1000));
   const min = Math.floor((remaining % (3600*1000)) / (60*1000));
-  if (d > 0) return `+${rate}% in ${d}d ${h}h`;
-  if (h > 0) return `+${rate}% in ${h}h ${min}m`;
-  return `+${rate}% in ${min}m`;
+  if (d > 0) return \`+\${rate}% in \${d}d \${h}h\`;
+  if (h > 0) return \`+\${rate}% in \${h}h \${min}m\`;
+  return \`+\${rate}% in \${min}m\`;
 }
 
 // ─── INTEREST (manual) ──────────────────────────────────
@@ -838,7 +837,7 @@ function openEdit(id) {
   const a = accounts.find(x => x.id === id); if(!a) return;
   editingId = id;
   document.getElementById('modalTitle').textContent = 'Edit Account';
-  document.getElementById('modalSub').textContent = `Editing "${a.name}"`;
+  document.getElementById('modalSub').textContent = \`Editing "\${a.name}"\`;
   document.getElementById('mName').value = a.name;
   document.getElementById('mBalance').value = a.balance;
   document.getElementById('modalError').textContent = '';
@@ -854,11 +853,11 @@ async function saveAccount() {
   if (isNaN(balance)) { errEl.textContent = 'Enter a valid balance.'; return; }
   try {
     if (editingId) {
-      await api("PUT", `accounts/${editingId}`, { name, balance });
-      toast(`"${name}" updated ✓`);
+      await api("PUT", \`accounts/\${editingId}\`, { name, balance });
+      toast(\`"\${name}" updated ✓\`);
     } else {
       await api("POST", "accounts", { name, balance });
-      toast(`"${name}" added ✓`);
+      toast(\`"\${name}" added ✓\`);
     }
     closeModal('accountModal');
     await loadAccounts();
@@ -868,7 +867,7 @@ async function saveAccount() {
 function openAdjust(id) {
   const a = accounts.find(x => x.id === id); if(!a) return;
   adjustingId = id;
-  document.getElementById('adjustTitle').textContent = `Adjust: ${a.name}`;
+  document.getElementById('adjustTitle').textContent = \`Adjust: \${a.name}\`;
   document.getElementById('adjustCurrent').innerHTML = fmt(a.balance);
   document.getElementById('aAmount').value = '';
   document.getElementById('adjustError').textContent = '';
@@ -881,10 +880,10 @@ async function saveAdjust() {
   const errEl  = document.getElementById('adjustError');
   if (isNaN(amount) || amount === 0) { errEl.textContent = 'Enter a non-zero amount.'; return; }
   try {
-    await api("POST", `accounts/${adjustingId}/adjust`, { amount });
+    await api("POST", \`accounts/\${adjustingId}/adjust\`, { amount });
     closeModal('adjustModal');
     await loadAccounts();
-    toast(`Balance ${amount >= 0 ? 'increased' : 'decreased'} ✓`);
+    toast(\`Balance \${amount >= 0 ? 'increased' : 'decreased'} ✓\`);
   } catch(e) { errEl.textContent = e.message; }
 }
 
@@ -898,10 +897,10 @@ function openDelete(id) {
 async function confirmDelete() {
   const a = accounts.find(x => x.id === deletingId); if(!a) return;
   try {
-    await api("DELETE", `accounts/${deletingId}`);
+    await api("DELETE", \`accounts/\${deletingId}\`);
     closeModal('deleteModal');
     await loadAccounts();
-    toast(`"${a.name}" removed`);
+    toast(\`"\${a.name}" removed\`);
   } catch(e) { toast("Error: " + e.message); }
 }
 
