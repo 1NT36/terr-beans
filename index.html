@@ -137,6 +137,8 @@
     const loading = document.getElementById('loading');
 
     input.addEventListener('keydown', e => { if (e.key === 'Enter') submitGate(); });
+    // Ensure clicking/tapping the Enter button also triggers submission
+    btn.addEventListener('click', submitGate);
 
     async function submitGate() {
       const key = input.value.trim();
